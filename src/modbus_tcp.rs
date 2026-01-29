@@ -1,10 +1,10 @@
 use super::*;
-pub struct ModbusTCPBuilder {
+pub struct ModbusTCPUnitBuilder {
     unit_builder: ModbusUnitBuilder,
     device_id: Option<u8>,
 }
 
-impl ModbusTCPBuilder {
+impl ModbusTCPUnitBuilder {
     pub fn address(mut self, addr: i32) -> Self {
         self.unit_builder.address(addr);
         self
@@ -40,13 +40,13 @@ impl ModbusTCPBuilder {
         self
     }
 
-    pub fn build(self) -> Result<ModbusTCP, ModbusTransportError> {
+    pub fn build(self) -> Result<ModbusTCPUnit, ModbusTransportError> {
         let unit = self.unit_builder.build()
             .map_err(ModbusTransportError::Protocol)?;
 
         let device_id = self.device_id.ok_or(ModbusTransportError::DeviceIdMissing)?;
 
-        Ok(ModbusTCP {
+        Ok(ModbusTCPUnit {
             unit,
             transaction_id: 0,
             device_id,
@@ -55,16 +55,16 @@ impl ModbusTCPBuilder {
 }
 
 /// Modbus TCP client with encapsulated protocol logic
-pub struct ModbusTCP {
+pub struct ModbusTCPUnit {
     unit: ModbusUnit,
     transaction_id: u16,
     device_id: u8,
 }
 
-impl ModbusTCP {
+impl ModbusTCPUnit {
     /// Create new builder for Modbus TCP
-    pub fn builder() -> ModbusTCPBuilder {
-        ModbusTCPBuilder {
+    pub fn builder() -> ModbusTCPUnitBuilder {
+        ModbusTCPUnitBuilder {
             unit_builder: ModbusUnit::builder(),
             device_id: None,
         }

@@ -1,4 +1,4 @@
-use a3ot_modbus_protocol::{ModbusTCP, ModbusRTU, RegisterType, ModbusTransportError};
+use a3ot_modbus_protocol::{ModbusTCPUnit, ModbusRTU, RegisterType, ModbusTransportError};
 
 #[cfg(test)]
 mod tcp_tests {
@@ -6,7 +6,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_builder_success() {
-        let modbus = ModbusTCP::builder()
+        let modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(10)
             .register_type(RegisterType::HoldingRegister)
@@ -18,7 +18,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_builder_missing_device_id() {
-        let modbus = ModbusTCP::builder()
+        let modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(10)
             .register_type(RegisterType::HoldingRegister)
@@ -29,7 +29,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_builder_invalid_address() {
-        let modbus = ModbusTCP::builder()
+        let modbus = ModbusTCPUnit::builder()
             .address(70000) // > 65535
             .length(10)
             .register_type(RegisterType::HoldingRegister)
@@ -41,7 +41,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_read_request_format() {
-        let mut modbus = ModbusTCP::builder()
+        let mut modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(10)
             .register_type(RegisterType::HoldingRegister)
@@ -83,7 +83,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_transaction_id_increments() {
-        let mut modbus = ModbusTCP::builder()
+        let mut modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(10)
             .register_type(RegisterType::HoldingRegister)
@@ -101,7 +101,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_parse_valid_response() {
-        let modbus = ModbusTCP::builder()
+        let modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(2)
             .register_type(RegisterType::HoldingRegister)
@@ -133,7 +133,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_parse_frame_too_short() {
-        let modbus = ModbusTCP::builder()
+        let modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(2)
             .register_type(RegisterType::HoldingRegister)
@@ -149,7 +149,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_parse_invalid_protocol_id() {
-        let modbus = ModbusTCP::builder()
+        let modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(2)
             .register_type(RegisterType::HoldingRegister)
@@ -174,7 +174,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_parse_unit_id_mismatch() {
-        let modbus = ModbusTCP::builder()
+        let modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(2)
             .register_type(RegisterType::HoldingRegister)
@@ -202,7 +202,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_write_request() {
-        let mut modbus = ModbusTCP::builder()
+        let mut modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(2)
             .register_type(RegisterType::HoldingRegister)
@@ -239,7 +239,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_write_without_setting_data() {
-        let mut modbus = ModbusTCP::builder()
+        let mut modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(2)
             .register_type(RegisterType::HoldingRegister)
@@ -254,7 +254,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_write_partial_data() {
-        let mut modbus = ModbusTCP::builder()
+        let mut modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(3)
             .register_type(RegisterType::HoldingRegister)
@@ -274,7 +274,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_custom_write_command() {
-        let mut modbus = ModbusTCP::builder()
+        let mut modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(1)
             .register_type(RegisterType::HoldingRegister)
@@ -292,7 +292,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_set_to_with_index() {
-        let modbus = ModbusTCP::builder()
+        let modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(5)
             .register_type(RegisterType::HoldingRegister)
@@ -308,7 +308,7 @@ mod tcp_tests {
 
     #[test]
     fn test_tcp_value_overflow() {
-        let modbus = ModbusTCP::builder()
+        let modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(2)
             .register_type(RegisterType::HoldingRegister)
@@ -491,7 +491,7 @@ mod coil_tests {
 
     #[test]
     fn test_tcp_single_coil_write() {
-        let mut modbus = ModbusTCP::builder()
+        let mut modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(1)
             .register_type(RegisterType::CoilRegister)
@@ -511,7 +511,7 @@ mod coil_tests {
 
     #[test]
     fn test_tcp_multi_coil_bit_packing() {
-        let mut modbus = ModbusTCP::builder()
+        let mut modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(9)
             .register_type(RegisterType::CoilRegister)
@@ -535,7 +535,7 @@ mod coil_tests {
 
     #[test]
     fn test_tcp_parse_coils_response() {
-        let modbus = ModbusTCP::builder()
+        let modbus = ModbusTCPUnit::builder()
             .address(100)
             .length(10)
             .register_type(RegisterType::CoilRegister)

@@ -6,7 +6,7 @@ mod modbus_rtu;
 
 pub use core::{RegisterType};
 pub use modbus_rtu::{ModbusRTU, ModbusRTUBuilder};
-pub use modbus_tcp::{ModbusTCP, ModbusTCPBuilder};
+pub use modbus_tcp::{ModbusTCPUnit, ModbusTCPUnitBuilder};
 
 use core::{ModbusUnit, ModbusUnitBuilder, ModbusUnitError};
 
