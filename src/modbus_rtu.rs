@@ -77,14 +77,14 @@ impl ModbusRTU {
     }
 
     /// Generate complete RTU frame for write request
-    pub fn create_write_request(&self, data: &[i32]) -> Result<Vec<u8>, ModbusTransportError> {
-        let pdu = self.unit.get_write_request(data)
+    pub fn create_write_request(&self) -> Result<Vec<u8>, ModbusTransportError> {
+        let pdu = self.unit.get_write_request()
             .map_err(ModbusTransportError::Protocol)?;
         Ok(self.wrap_rtu(pdu))
     }
 
     /// Parse RTU response and extract values
-    pub fn parse_response(&self, frame: &[u8]) -> Result<Vec<u16>, ModbusTransportError> {
+    pub fn parse_response(&self, frame: &[u8]) -> Result<(), ModbusTransportError> {
         let pdu = self.unwrap_rtu(frame)?;
         self.unit.parse_response(&pdu)
             .map_err(ModbusTransportError::Protocol)

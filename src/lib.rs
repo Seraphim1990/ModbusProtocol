@@ -29,4 +29,10 @@ pub enum ModbusTransportError {
 
     #[error("Protocol error: {0}")]
     Protocol(#[from] ModbusUnitError),
+
+    #[error("Value overflow:{0} as u16 at index {1}")]
+    ValueOverflow(i32, usize),
+
+    #[error("Invalid index at set")]
+    InvalidIndexAtSet,
 }

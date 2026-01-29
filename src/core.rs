@@ -1,4 +1,7 @@
+use std::cell::RefCell;
 use thiserror::Error;
+use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
+use crate::ModbusTransportError;
 
 #[derive(Debug, Error)]
 pub enum ModbusUnitError {
@@ -30,9 +33,6 @@ pub enum ModbusUnitError {
     #[error("Type {0:?} haven't write command")]
     InvalidRegisterTypeForWriteCommand(RegisterType),
 
-    #[error("Value {0} overflow u16 or i16")]
-    ValueOverflow(i32),
-
     #[error("Invalid coil value {0} at index {1}, expected 0 or 1")]
     InvalidCoilValue(i32, usize),
 
@@ -50,6 +50,15 @@ pub enum ModbusUnitError {
 
     #[error("Data length mismatch: expected max {expected}, got {actual}")]
     DataLengthMismatch { expected: usize, actual: usize },
+
+    #[error("index out of range for {0} write")]
+    WriteIndexOutOfRange(usize),
+
+    #[error("index out of range for {0} read")]
+    ReadIndexOutOfRange(usize),
+
+    #[error("Write value not set at index {index} (address {address})")]
+    WriteValueNotSet { index: usize, address: u16 },
 }
 
 #[derive(Copy, Clone, Debug, )]
@@ -67,6 +76,9 @@ pub struct ModbusUnit {
     read_cmd: Option<i32>,
     write_cmd: Option<i32>,
     multi_write_cmd: Option<i32>,
+
+    write_vec: RefCell<Vec<Option<u16>>>,
+    read_vec: RefCell<Vec<u16>>,
 }
 
 pub struct ModbusUnitBuilder {
@@ -163,6 +175,10 @@ impl ModbusUnitBuilder {
             },
             None => None,
         };
+
+        let write_vec: Vec<Option<u16>> = vec![None; length as usize];
+        let read_vec: Vec<u16> = vec![0; length as usize];
+
         Ok(
             ModbusUnit {
                 start_addr: start_addr as u16,
@@ -171,6 +187,8 @@ impl ModbusUnitBuilder {
                 read_cmd: read_cmd,
                 write_cmd: write_cmd,
                 multi_write_cmd: multi_write_cmd,
+                write_vec: RefCell::new(write_vec),
+                read_vec: RefCell::new(read_vec),
             }
         )
     }
@@ -211,21 +229,32 @@ impl ModbusUnit {
         }
     }
 
-    pub fn get_write_request(&self, data: &[i32]) -> Result<Vec<u8>, ModbusUnitError> {
+    pub fn get_write_request(&self) -> Result<Vec<u8>, ModbusUnitError> {
         // Validate data length matches unit length
-        if data.len() > self.length as usize {
-            return Err(ModbusUnitError::DataLengthMismatch {
-                expected: self.length as usize,
-                actual: data.len(),
-            });
-        }
+        let validated_data: Vec<u16> = self.write_vec
+            .borrow()
+            .iter()
+            .enumerate()
+            .map(|(i, opt)| {
+                opt.ok_or(ModbusUnitError::WriteValueNotSet {
+                    index: i,
+                    address: self.start_addr + i as u16,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        let cmd = self.get_write_command(data.len())?;
+        let cmd = self.get_write_command(validated_data.len())?;
 
         match self.register_type {
-            RegisterType::CoilRegister => self.get_for_body_for_coils_write(data, cmd),
-            RegisterType::HoldingRegister => self.get_for_body_for_holding_write(data, cmd),
-            _ => Err(ModbusUnitError::InvalidRegisterTypeForWriteCommand(self.register_type))
+            RegisterType::CoilRegister => {
+                self.get_for_body_for_coils_write(&validated_data, cmd)
+            }
+            RegisterType::HoldingRegister => {
+                self.get_for_body_for_holding_write(&validated_data, cmd)
+            }
+            _ => Err(ModbusUnitError::InvalidRegisterTypeForWriteCommand(
+                self.register_type,
+            )),
         }
     }
 
@@ -260,8 +289,8 @@ impl ModbusUnit {
         Ok(cmd)
     }
 
-    fn get_for_body_for_holding_write(&self, data: &[i32], cmd: u8) -> Result<Vec<u8>, ModbusUnitError> {
-        let request_len = 3 + { if data.len() == 1 {2} else {3 + data.len() * 2} }; // ← Змінено: +3 замість +2
+    fn get_for_body_for_holding_write(&self, data: &[u16], cmd: u8) -> Result<Vec<u8>, ModbusUnitError> {
+        let request_len = 3 + { if data.len() == 1 {2} else {3 + data.len() * 2} };
         let mut result: Vec<u8> = Vec::with_capacity(request_len);
         result.push(cmd);
         result.push((self.start_addr >> 8) as u8);
@@ -273,22 +302,18 @@ impl ModbusUnit {
             result.push((data.len() * 2) as u8);  // ← ДОДАНО ByteCount!
         }
 
-        for item in data.iter() {
-            let val = match i16::try_from(*item) {
-                Ok(val) => val,
-                Err(_) => return Err(ModbusUnitError::ValueOverflow(*item))
-            };
-            result.push((val >> 8) as u8);
-            result.push(val as u8);
+        for &item in data.iter() {
+            result.push((item >> 8) as u8);
+            result.push(item as u8);
         }
         Ok(result)
     }
 
-    fn get_for_body_for_coils_write(&self, data: &[i32], cmd: u8) -> Result<Vec<u8>, ModbusUnitError> {
+    fn get_for_body_for_coils_write(&self, data: &[u16], cmd: u8) -> Result<Vec<u8>, ModbusUnitError> {
         // Validate: all values must be 0 or 1
         for (i, &val) in data.iter().enumerate() {
             if val != 0 && val != 1 {
-                return Err(ModbusUnitError::InvalidCoilValue(val, i));
+                return Err(ModbusUnitError::InvalidCoilValue(val as i32, i));
             }
         }
 
@@ -329,7 +354,7 @@ impl ModbusUnit {
         }
         Ok(result)
     }
-    pub fn parse_response(&self, pdu: &[u8]) -> Result<Vec<u16>, ModbusUnitError> {
+    pub fn parse_response(&self, pdu: &[u8]) -> Result<(), ModbusUnitError> {
         if pdu.is_empty() {
             return Err(ModbusUnitError::EmptyResponse);
         }
@@ -359,7 +384,7 @@ impl ModbusUnit {
         }
     }
 
-    fn parse_holding_registers(&self, pdu: &[u8]) -> Result<Vec<u16>, ModbusUnitError> {
+    fn parse_holding_registers(&self, pdu: &[u8]) -> Result<(), ModbusUnitError> {
         if pdu.len() < 2 {
             return Err(ModbusUnitError::InvalidResponseLength);
         }
@@ -371,17 +396,19 @@ impl ModbusUnit {
             return Err(ModbusUnitError::InvalidResponseLength);
         }
 
-        let mut result:Vec<u16> = Vec::with_capacity(self.length as usize);
+        // let mut result:Vec<u16> = Vec::with_capacity(self.length as usize);
 
         for i in 0..self.length as usize {
             let offset = 2 + i * 2;
             let value = ((pdu[offset] as u16) << 8) | (pdu[offset + 1] as u16);
-            result.push(value);
+            self.read_vec.borrow_mut()[i] = value;
+            // result.push(value);
         }
-        Ok(result)
+
+        Ok(())
     }
 
-    fn parse_coils(&self, pdu: &[u8]) -> Result<Vec<u16>, ModbusUnitError> {
+    fn parse_coils(&self, pdu: &[u8]) -> Result<(), ModbusUnitError> {
         if pdu.len() < 2 {
             return Err(ModbusUnitError::InvalidResponseLength);
         }
@@ -393,14 +420,29 @@ impl ModbusUnit {
             return Err(ModbusUnitError::InvalidResponseLength);
         }
 
-        let mut result = Vec::with_capacity(self.length as usize);
+        // let mut result = Vec::with_capacity(self.length as usize);
 
         for i in 0..self.length as usize {
             let byte_idx = i / 8;
             let bit_idx = i % 8;
             let bit_value = (pdu[2 + byte_idx] >> bit_idx) & 0x01;
-            result.push(bit_value as u16);
+            self.read_vec.borrow_mut()[i] = bit_value as u16;
+            // result.push(bit_value as u16);
         }
-        Ok(result)
+        Ok(())
+    }
+    pub fn get(&self, index: usize) -> Result<u16, ModbusUnitError> {
+        if index >= self.read_vec.borrow().len() {
+            return Err(ModbusUnitError::ReadIndexOutOfRange(index));
+        };
+        Ok(self.read_vec.borrow()[index])
+    }
+
+    pub fn set(&self, index: usize, value: u16) -> Result<(), ModbusUnitError> {
+        if index >= self.write_vec.borrow().len() {
+            return Err(ModbusUnitError::WriteIndexOutOfRange(index));
+        }
+        self.write_vec.borrow_mut()[index] = Some(value);
+        Ok(())
     }
 }

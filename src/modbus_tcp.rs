@@ -77,14 +77,14 @@ impl ModbusTCP {
         Ok(self.wrap_tcp(pdu))
     }
 
-    pub fn create_write_request(&mut self, data: &[i32]) -> Result<Vec<u8>, ModbusTransportError> {
-        let pdu = self.unit.get_write_request(data)
+    pub fn create_write_request(&mut self) -> Result<Vec<u8>, ModbusTransportError> {
+        let pdu = self.unit.get_write_request()
             .map_err(ModbusTransportError::Protocol)?;
         Ok(self.wrap_tcp(pdu))
     }
 
     /// Parse TCP response and extract values
-    pub fn parse_response(&self, frame: &[u8]) -> Result<Vec<u16>, ModbusTransportError> {
+    pub fn parse_response(&self, frame: &[u8]) -> Result<(), ModbusTransportError> {
         let pdu = self.unwrap_tcp(frame)?;
         self.unit.parse_response(&pdu)
             .map_err(ModbusTransportError::Protocol)
@@ -134,5 +134,39 @@ impl ModbusTCP {
         }
 
         Ok(frame[7..expected_len].to_vec())
+    }
+    pub fn set(&self, data: &[i32]) -> Result<(), ModbusTransportError> {
+        for (i, &val) in data.iter().enumerate() {
+            let res = u16::try_from(val).map_err(|_| ModbusTransportError::ValueOverflow(val, i))?;
+            self.unit.set(i, res)?;
+        }
+        Ok(())
+    }
+    // pub fn set_to(&self, index: impl Into<usize>, data: i32) -> Result<(), ModbusTransportError> {
+    //     let i = index.into();
+    //     let res = u16::try_from(data).map_err(|_| ModbusTransportError::ValueOverflow(data, i))?;
+    //     self.unit.set(i, res)?;
+    //     Ok(())
+    // }
+
+    pub fn set_to<I>(&self, index: I, data: i32) -> Result<(), ModbusTransportError>
+    where
+        I: TryInto<usize>,
+        I::Error: std::fmt::Debug,
+    {
+        let i = index
+            .try_into()
+            .map_err(|_| ModbusTransportError::InvalidIndexAtSet)?;
+        let res = u16::try_from(data).map_err(|_| ModbusTransportError::ValueOverflow(data, i))?;
+        self.unit.set(i, res)?;
+        Ok(())
+    }
+
+    pub fn get(&self) -> Vec<i32> {
+        (0..)
+            .map(|i| self.unit.get(i))
+            .take_while(|r| r.is_ok())
+            .map(|r| r.unwrap() as i32)
+            .collect()
     }
 }
