@@ -84,7 +84,7 @@ impl ModbusTCPUnit {
     }
 
     /// Parse TCP response and extract values
-    pub fn parse_response(&self, frame: &[u8]) -> Result<(), ModbusTransportError> {
+    pub fn parse_response(&self, frame: Vec<u8>) -> Result<(), ModbusTransportError> {
         let pdu = self.unwrap_tcp(frame)?;
         self.unit.parse_response(&pdu)
             .map_err(ModbusTransportError::Protocol)
@@ -108,7 +108,7 @@ impl ModbusTCPUnit {
         frame
     }
 
-    fn unwrap_tcp(&self, frame: &[u8]) -> Result<Vec<u8>, ModbusTransportError> {
+    fn unwrap_tcp(&self, frame: Vec<u8>) -> Result<Vec<u8>, ModbusTransportError> {
         if frame.len() < 7 {
             return Err(ModbusTransportError::FrameTooShort);
         }
