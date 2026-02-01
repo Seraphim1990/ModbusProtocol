@@ -8,7 +8,7 @@ pub use core::{RegisterType};
 pub use modbus_rtu::{ModbusRTU, ModbusRTUBuilder};
 pub use modbus_tcp::{ModbusTCPUnit, ModbusTCPUnitBuilder};
 
-use core::{ModbusUnit, ModbusUnitBuilder, ModbusUnitError};
+pub use core::{ModbusUnit, ModbusUnitBuilder, ModbusUnitError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ModbusTransportError {
